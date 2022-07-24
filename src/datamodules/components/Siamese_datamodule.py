@@ -13,7 +13,7 @@ from torch.utils.data.dataset import Dataset
 import os
 import torch
 from PIL import Image
-from src.utils.utils import torch_center_and_normalize, sort_jointly, load_obj, load_text
+from src.utils.util import torch_center_and_normalize, sort_jointly, load_obj, load_text
 # from torch._six import container_abcs, string_classes, int_classes
 
 import trimesh
