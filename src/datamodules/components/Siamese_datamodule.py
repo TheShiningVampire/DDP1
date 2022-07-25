@@ -4,6 +4,7 @@ from os import path
 from unicodedata import name
 import warnings
 import json
+from cv2 import transform         #TODO: Uncomment this line
 import numpy as np
 import glob
 import h5py
@@ -13,7 +14,7 @@ from torch.utils.data.dataset import Dataset
 import os
 import torch
 from PIL import Image
-from src.utils.util import torch_center_and_normalize, sort_jointly, load_obj, load_text
+from src.utils.utils import torch_center_and_normalize, sort_jointly, load_obj, load_text
 # from torch._six import container_abcs, string_classes, int_classes
 
 import trimesh
@@ -21,7 +22,11 @@ import math
 from pytorch3d.structures import Meshes
 from pytorch3d.renderer.mesh import Textures
 
-from src.utils.util import rotation_matrix
+from src.utils.utils import rotation_matrix
+
+import torchvision.datasets as datasets
+import random
+
 
 
 def collate_fn(batch):
@@ -318,10 +323,11 @@ class ShapeNetCore(ShapeNetBase):
         return self.label_by_number[label_str], mesh, points
 
 
-class Pix3D(ShapeNetBase):
+class Siamese_Pix3D(ShapeNetBase):
     def __init__(self, data_dir, split, nb_points, synsets=None, version: int = 2, 
-                load_textures: bool = False, texture_resolution: int = 4, dset_norm: str = "inf", simplified_mesh=False):
+                load_textures: bool = False, texture_resolution: int = 4, dset_norm: str = "inf", simplified_mesh=False, transform=None):
         super().__init__()
+        data_dir = path.join(data_dir, split)
         self.shapenet_dir = data_dir
         self.nb_points = nb_points
         self.load_textures = load_textures
@@ -331,7 +337,12 @@ class Pix3D(ShapeNetBase):
         self.simplified_mesh = simplified_mesh
         self.model_dir = "model.obj"
         self.pix3d_dir = path.join(data_dir, "model")
-        
+        self.image_dir = path.join(data_dir, "img")
+        self.transform = transform
+
+        ## Image folder dataset contatining all the classes
+        self.imageFolderDataset = datasets.ImageFolder(self.image_dir)
+
         data_dir = path.join(data_dir, "model")
         
         synset_set = {
@@ -339,9 +350,6 @@ class Pix3D(ShapeNetBase):
                 for synset in os.listdir(data_dir)
                 if path.isdir(path.join(data_dir, synset))
             }
-        
-        # Not using the 'misc' category for this project
-        synset_set.remove("misc")
         
         self.classes = sorted(list(synset_set))
         self.label_by_number = {k: v for v, k in enumerate(self.classes)}
@@ -398,12 +406,38 @@ class Pix3D(ShapeNetBase):
         ), faces=faces.numpy()).sample(self.nb_points, False)
         points = torch.from_numpy(points).to(torch.float)
         points = torch_center_and_normalize(points, p=self.dset_norm)
-        return self.label_by_number[label_str], mesh, points
+
+
+        ## Also adding the images now
+        ## Taking approximately 50% of the images from same class
+
+        class_indx = self.label_by_number[label_str]
+        should_get_same_class = random.randint(0, 1)
+        if should_get_same_class:
+            while True:
+                img_tuple = random.choice(self.imageFolderDataset.imgs)
+                if img_tuple[1] == class_indx:
+                    break
+        else:
+            while True:
+                img_tuple = random.choice(self.imageFolderDataset.imgs)
+                if img_tuple[1] != class_indx:
+                    break
+
+        img = Image.open(img_tuple[0])
+
+        # TODO: Add transforms here
+        if self.transform is not None:
+            img = self.transform(img)
+
+        return (mesh, points), img, torch.from_numpy(np.array([int(img_tuple[1] != class_indx)], dtype=np.float32))
 
 
 
-if __name__ == "__main__":
-    dset_train = Pix3D(data_dir, "train", nb_points=2048, load_textures=False,dset_norm=2, simplified_mesh=False)
+# if __name__ == "__main__":
+#     data_dir = '/home/SharedData/Vinit/pix3d_preprocessed/'
+#     transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])
+#     dset_train = Siamese_Pix3D(data_dir, split="train", nb_points=2048, load_textures=False,dset_norm=2, simplified_mesh=False, transform=transform)
 
-    train_loader = DataLoader(dset_train, batch_size=8,
-                          shuffle=True, num_workers=6, collate_fn=collate_fn, drop_last=True)
+#     train_loader = DataLoader(dset_train, batch_size=8,
+#                           shuffle=True, num_workers=6, collate_fn=collate_fn, drop_last=True)
