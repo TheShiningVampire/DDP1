@@ -3,7 +3,7 @@ _target_: src.models.Siamese_module.SiameseModule
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
-  lr: 0.001
+  lr: 0.000001
   weight_decay: 0.0
 
 # net:
@@ -39,4 +39,15 @@ multi_view_renderer:
   faces_per_pixel : 2
 
 mvnet_depth: 18
+feature_extractor_num_layers: 6
+
+siamese_cnn:
+  _target_: src.models.components.siamese_cnn.Siamese_CNN
+  input_channels: 128
+  input_size: 28
+
+criterion:
+  _target_: src.models.loss_functions.contrastive_loss.ContrastiveLoss
+  margin: 0.7
+
 

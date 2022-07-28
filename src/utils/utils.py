@@ -34,6 +34,12 @@ import glob
 import json
 import yaml
 
+import matplotlib.pyplot as plt
+from torchvision.utils import save_image
+def imsave(img, filename=None):    
+    # plt.imsave(np.transpose(npimg, (1, 2, 0)), filename) 
+    # Use save_image from torchvision to save the image 
+    save_image(img, filename)
 
 
 def read_json(file_path):

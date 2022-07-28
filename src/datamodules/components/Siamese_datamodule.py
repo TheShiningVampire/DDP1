@@ -417,14 +417,22 @@ class Siamese_Pix3D(ShapeNetBase):
             while True:
                 img_tuple = random.choice(self.imageFolderDataset.imgs)
                 if img_tuple[1] == class_indx:
-                    break
+                    img = Image.open(img_tuple[0])
+
+                    # Check if image has 3 channels
+                    if img.mode == "RGB":
+                        break
         else:
             while True:
                 img_tuple = random.choice(self.imageFolderDataset.imgs)
                 if img_tuple[1] != class_indx:
-                    break
+                    img = Image.open(img_tuple[0])
 
-        img = Image.open(img_tuple[0])
+                    # Check if image has 3 channels
+                    if img.mode == "RGB":
+                        break
+
+        
 
         # TODO: Add transforms here
         if self.transform is not None:

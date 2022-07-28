@@ -1,14 +1,18 @@
+from pyexpat import model
 from typing import Any, List
+from pandas import concat
 
 import torch
 from pytorch_lightning import LightningModule
-from torchmetrics import MaxMetric
+from torchmetrics import MaxMetric, MinMetric
 from torchmetrics.classification.accuracy import Accuracy
 import torchvision
 
-from src.models.components.multi_view import ViewMaxAgregate
+from src.utils.utils import batch_tensor, unbatch_tensor, imsave
 
 from src.utils.ops import regualarize_rendered_views
+from src.models.loss_functions.contrastive_loss import ContrastiveLoss
+import torch.nn.functional as F
 
 
 class SiameseModule(LightningModule):
@@ -28,10 +32,12 @@ class SiameseModule(LightningModule):
 
     def __init__(
         self,
-        # net: torch.nn.Module,
         multi_view_net: torch.nn.Module,
         multi_view_renderer: torch.nn.Module,
         mvnet_depth: int,
+        feature_extractor_num_layers: int,
+        siamese_cnn: torch.nn.Module,
+        criterion: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
     ):
         super().__init__()
@@ -50,100 +56,181 @@ class SiameseModule(LightningModule):
         depth2featdim = {18: 512, 34: 512, 50: 2048, 101: 2048, 152: 2048}
         assert mvnet_depth in depth2featdim.keys(), "mvnet_depth must be one of 18, 34, 50, 101, 152"
         mvnetwork = torchvision.models.__dict__["resnet{}".format(mvnet_depth)](pretrained=True)
-        mvnetwork.fc = torch.nn.Sequential()
-        self.mvnetwork = ViewMaxAgregate(mvnetwork)
+    
+        image_feature_extractor = torchvision.models.__dict__["resnet{}".format(mvnet_depth)](pretrained=True)
 
-        self.image_feature_extractor = torchvision.models.__dict__["resnet{}".format(mvnet_depth)](pretrained=True)
+        self.mvnetwork = torch.nn.Sequential(*list(mvnetwork.children())[:feature_extractor_num_layers])
+        self.image_feature_extractor = torch.nn.Sequential(*list(image_feature_extractor.children())[:feature_extractor_num_layers])
+
+
+        self.mvtn.requires_grad_(False)
+        self.mvtn_renderer.requires_grad_(False)
+        self.mvnetwork.requires_grad_(False)
+        self.image_feature_extractor.requires_grad_(False)
+
+        self.siamese_cnn = siamese_cnn
 
         # loss function
-        self.criterion = torch.nn.CrossEntropyLoss()
+        self.criterion = criterion
 
         # use separate metric instance for train, val and test step
         # to ensure a proper reduction over the epoch
-        self.train_acc = Accuracy()
-        self.val_acc = Accuracy()
-        self.test_acc = Accuracy()
+        # self.train_acc = Accuracy()
+        # self.val_acc = Accuracy()
+        # self.val_loss = ContrastiveLoss()
+        # self.test_acc = Accuracy()
 
         # for logging best so far validation accuracy
-        self.val_acc_best = MaxMetric()
+        # self.val_acc_best = MaxMetric()
+        # self.val_loss_best = MinMetric()
+
+    # def feature_extractor(self, meshes: torch.Tensor, points: torch.Tensor, image: torch.Tensor):
+    #     c_batch_size = len(meshes)
+
+    #     azim, elev, dist = self.mvtn(points,                 
+    #                             c_batch_size=c_batch_size)
+        
+    #     rendered_images, _ = self.mvtn_renderer(meshes, points,  
+    #                         azim=azim, elev=elev, dist=dist)
+
+    #     rendered_images = regualarize_rendered_views(rendered_images, 0.0, False, 0.3)
+
+
+    #     shape_features = self.ViewMaxAgregate(rendered_images)
+    #     image_features = self.image_feature_extractor(image)
+
+    #     return shape_features, image_features
+
+    # def ViewMaxAgregate(self, mvimages):
+    #     B, M, C, H, W = mvimages.shape
+    #     pooled_view = torch.max(unbatch_tensor(self.mvnetwork(batch_tensor(
+    #         mvimages, dim=1, squeeze=True).type(torch.FloatTensor)), B, dim=1, unsqueeze=True), dim=1)[0]
+    #     return pooled_view.squeeze()
 
     def forward(self, meshes: torch.Tensor, points: torch.Tensor, image: torch.Tensor):
         c_batch_size = len(meshes)
-        azim, elev, dist = self.mvtn(points,                 
-                                c_batch_size=c_batch_size)
+
+        with torch.no_grad():
+            azim, elev, dist = self.mvtn(points, c_batch_size=c_batch_size)
+            rendered_images, _ = self.mvtn_renderer(meshes, points, azim=azim, elev=elev, dist=dist)
+            rendered_images = regualarize_rendered_views(rendered_images, 0.0, False, 0.3)
+
+            B, M, C, H, W = rendered_images.shape
+            pooled_view = torch.max(unbatch_tensor(self.mvnetwork(batch_tensor(
+                rendered_images, dim=1, squeeze=True)
+                .type(torch.FloatTensor)
+                ), B, dim=1, unsqueeze=True), dim=1)[0]
+            shape_features = pooled_view.squeeze()
+
+            image_features = self.image_feature_extractor(image)
         
-        rendered_images, _ = self.mvtn_renderer(meshes, points,  
-                            azim=azim, elev=elev, dist=dist)
+        # TODO: remove this line while training
+        shape_features = shape_features.unsqueeze(0)
 
-        rendered_images = regualarize_rendered_views(rendered_images, 0.0, False, 0.3)
+        siamese_feature_shape, siamese_feature_image = self.siamese_cnn(shape_features, image_features)
 
-        # shape_features = self.mvnetwork(rendered_images)
-
-        # image_features = self.image_feature_extractor(image)
+        return siamese_feature_shape, siamese_feature_image
 
 
-        return rendered_images
 
     def on_train_start(self):
         # by default lightning executes validation step sanity checks before training starts,
         # so we need to make sure val_acc_best doesn't store accuracy from these checks
-        self.val_acc_best.reset()
+        # self.val_loss_best.reset()
+        pass
 
     def step(self, batch: Any):
         (model_shape, image, label) = batch
         meshes, points = model_shape
 
-        rendered_images = self.forward(meshes, points, image) 
-        logits = self.forward(x)
-        loss = self.criterion(logits, y)
-        preds = torch.argmax(logits, dim=1)
-        return loss, preds, y
+        siamese_feature_shape, siamese_feature_image = self.forward(meshes, points, image)
+
+        loss = self.criterion(output1=siamese_feature_shape, output2=siamese_feature_image, label=label)
+
+        return loss
 
     def training_step(self, batch: Any, batch_idx: int):
-        loss, preds, targets = self.step(batch)
+        loss = self.step(batch)
 
         # log train metrics
-        acc = self.train_acc(preds, targets)
+        # acc = self.train_acc(preds, targets)
         self.log("train/loss", loss, on_step=False, on_epoch=True, prog_bar=False)
-        self.log("train/acc", acc, on_step=False, on_epoch=True, prog_bar=True)
+        # self.log("train/acc", acc, on_step=False, on_epoch=True, prog_bar=True)
 
         # we can return here dict with any tensors
         # and then read it in some callback or in `training_epoch_end()` below
         # remember to always return loss from `training_step()` or else backpropagation will fail!
-        return {"loss": loss, "preds": preds, "targets": targets}
+        return {"loss": loss}
 
     def training_epoch_end(self, outputs: List[Any]):
         # `outputs` is a list of dicts returned from `training_step()`
-        self.train_acc.reset()
+        # self.train_acc.reset()
+        pass
 
     def validation_step(self, batch: Any, batch_idx: int):
-        loss, preds, targets = self.step(batch)
+        loss = self.step(batch)
 
         # log val metrics
-        acc = self.val_acc(preds, targets)
+        # acc = self.val_acc(preds, targets)
         self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=False)
-        self.log("val/acc", acc, on_step=False, on_epoch=True, prog_bar=True)
+        # self.log("val/acc", acc, on_step=False, on_epoch=True, prog_bar=True)
 
-        return {"loss": loss, "preds": preds, "targets": targets}
+        return {"loss": loss} #, "preds": preds, "targets": targets}
 
     def validation_epoch_end(self, outputs: List[Any]):
-        acc = self.val_acc.compute()  # get val accuracy from current epoch
-        self.val_acc_best.update(acc)
-        self.log("val/acc_best", self.val_acc_best.compute(), on_epoch=True, prog_bar=True)
-        self.val_acc.reset()
+        # acc = self.val_acc.compute()  # get val accuracy from current epoch
+        # loss = self.val_loss.forward()  # get val loss from current epoch
+        # self.val_loss_best.update(loss)  # update best val loss
+        # self.log("val/loss_best", self.val_loss_best.compute(), on_epoch=True, prog_bar=True)
+        # self.val_loss.reset()
+        pass
 
     def test_step(self, batch: Any, batch_idx: int):
-        loss, preds, targets = self.step(batch)
+        # loss = self.step(batch)
 
-        # log test metrics
-        acc = self.test_acc(preds, targets)
-        self.log("test/loss", loss, on_step=False, on_epoch=True)
-        self.log("test/acc", acc, on_step=False, on_epoch=True)
+        # # log test metrics
+        # # acc = self.test_acc(preds, targets)
+        # self.log("test/loss", loss, on_step=False, on_epoch=True)
+        # # self.log("test/acc", acc, on_step=False, on_epoch=True)
 
-        return {"loss": loss, "preds": preds, "targets": targets}
+        # return {"loss": loss} #, "preds": preds, "targets": targets}
+
+        if batch_idx == 0:
+            # We check the dissimilarity between the first image in the batch and the rest of the shapes
+            (model_shape, image, label) = batch
+            mesh, point = model_shape
+            batch_size = len(mesh)
+            image0 = image[0]
+
+            for i in range(batch_size):
+                meshes = mesh[i]
+                points = point[i]
+                points = points.unsqueeze(0)
+                azim, elev, dist = self.mvtn(points, c_batch_size=1)
+                rendered_images, _ = self.mvtn_renderer(meshes, points, azim=azim, elev=elev, dist=dist)
+                rendered_images = regualarize_rendered_views(rendered_images, 0.0, False, 0.3)
+
+                # Take one of the rendered images and compare it to the first image
+                image_i = rendered_images[0][3]
+                image0 = image0.squeeze(0)
+                concat_image = torch.cat((image0, image_i.detach().cpu()), axis=1)
+
+                # Calculate the dissimilarity between the first image and the rest of the shapes
+                # Reshape image0 as 1x3xHxW
+                image0 = image0.unsqueeze(0)
+
+                shape_features, image_features = self.forward(meshes, points, image0)
+                euclidean_distance = F.pairwise_distance(shape_features, image_features)
+
+                # Save the dissimilarity and the image
+                imsave(torchvision.utils.make_grid(concat_image), 'results/fast_wave_11/image_' + str(i) + f'Dissimilarity: {euclidean_distance.item():.2f}'  +  '.png')
+
+        return {"loss": 0} #, "preds": preds, "targets": targets}
+
 
     def test_epoch_end(self, outputs: List[Any]):
-        self.test_acc.reset()
+        # self.test_acc.reset()
+        pass
 
     def configure_optimizers(self):
         """Choose what optimizers and learning-rate schedulers to use in your optimization.
@@ -153,7 +240,7 @@ class SiameseModule(LightningModule):
             https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
         """
         return {
-            "optimizer": self.hparams.optimizer(params=self.parameters()),
+            "optimizer": self.hparams.optimizer(params=self.siamese_cnn.parameters()),
         }
 
 
