@@ -114,8 +114,17 @@ class MNISTLitModule(LightningModule):
         Examples:
             https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
         """
+        optimizer = self.hparams.optimizer(params=self.parameters())
+        scheduler = self.hparams.scheduler(optimizer=optimizer)
+
         return {
-            "optimizer": self.hparams.optimizer(params=self.parameters()),
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "monitor": "train/loss",
+                "interval": "epoch",
+                "frequency": 1,
+            },
         }
 
 

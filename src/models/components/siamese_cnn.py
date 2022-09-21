@@ -9,20 +9,20 @@ class Siamese_CNN(nn.Module):
         ):
         super().__init__()
 
-        self.conv1 = nn.Conv2d(input_channels, 256, kernel_size=3, stride=1, padding=1)
-        self.batchnorm1 = nn.BatchNorm2d(256)
+        self.conv1 = nn.Conv2d(input_channels, input_channels*2, kernel_size=3, stride=1, padding=1)
+        self.batchnorm1 = nn.BatchNorm2d( input_channels*2)
         self.relu1 = nn.ReLU()
         self.maxpool1 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        self.conv2 = nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1)
-        self.batchnorm2 = nn.BatchNorm2d(512)
+        self.conv2 = nn.Conv2d(input_channels*2, input_channels*4, kernel_size=3, stride=1, padding=1)
+        self.batchnorm2 = nn.BatchNorm2d(input_channels*4)
         self.relu2 = nn.ReLU()
         self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # Use the FC layers of a pretrained network (ResNet-18)
-        resnet18 = torchvision.models.resnet18(pretrained=True)
-        self.avgpool = resnet18.avgpool
-        self.fc1 = resnet18.fc
+        resnet50 = torchvision.models.resnet50(pretrained=True)
+        self.avgpool = resnet50.avgpool
+        self.fc1 = resnet50.fc
         self.dropout1 = nn.Dropout(p=0.5)
         self.relu3 = nn.ReLU()
         self.fc2 = nn.Linear(1000, 256)

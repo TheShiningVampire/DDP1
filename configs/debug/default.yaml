@@ -11,7 +11,7 @@ callbacks: null
 logger: null
 
 extras:
-  ignore_warnings: False
+  ignore_warnings: True
   enforce_tags: False
 
 # sets level of all command line loggers to 'DEBUG'
@@ -19,14 +19,14 @@ extras:
 hydra:
   job_logging:
     root:
-      level: DEBUG
+      level: INFO
 
   # use this to also set hydra loggers to 'DEBUG'
   # verbose: True
 
 trainer:
   max_epochs: 1
-  accelerator: cpu # debuggers don't like gpus
+  accelerator: gpu # debuggers don't like gpus
   devices: 1 # debuggers don't like multiprocessing
   detect_anomaly: true # raise exception if NaN or +/-inf is detected in any tensor
 

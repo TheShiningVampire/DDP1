@@ -39,6 +39,7 @@ class SiameseModule(LightningModule):
         siamese_cnn: torch.nn.Module,
         criterion: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
+        scheduler: torch.optim.lr_scheduler,
     ):
         super().__init__()
 
@@ -231,16 +232,18 @@ class SiameseModule(LightningModule):
         pass
 
     def configure_optimizers(self):
-        """Choose what optimizers and learning-rate schedulers to use in your optimization.
-        Normally you'd need one. But in the case of GANs or similar you might have multiple.
+        optimizer = self.hparams.optimizer(params=self.parameters())
+        scheduler = self.hparams.scheduler(optimizer=optimizer)
 
-        Examples:
-            https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
-        """
         return {
-            "optimizer": self.hparams.optimizer(params=self.siamese_cnn.parameters()),
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "monitor": "train/loss",
+                "interval": "epoch",
+                "frequency": 1,
+            },
         }
-
 
 if __name__ == "__main__":
     import hydra
