@@ -116,15 +116,14 @@ class SiameseModule(LightningModule):
 
             B, M, C, H, W = rendered_images.shape
             pooled_view = torch.max(unbatch_tensor(self.mvnetwork(batch_tensor(
-                rendered_images, dim=1, squeeze=True)
-                # .type(torch.FloatTensor)
+                rendered_images, dim=1, squeeze=True).type(torch.FloatTensor)
                 ), B, dim=1, unsqueeze=True), dim=1)[0]
             shape_features = pooled_view.squeeze()
 
             image_features = self.image_feature_extractor(image)
         
         # TODO: remove this line while training
-        # shape_features = shape_features.unsqueeze(0)
+        shape_features = shape_features.unsqueeze(0)
 
         siamese_feature_shape, siamese_feature_image = self.siamese_cnn(shape_features, image_features)
 
@@ -219,10 +218,11 @@ class SiameseModule(LightningModule):
                 image0 = image0.unsqueeze(0)
 
                 shape_features, image_features = self.forward(meshes, points, image0)
-                euclidean_distance = F.pairwise_distance(shape_features, image_features)
+                cosine_similarity = F.cosine_similarity(shape_features, image_features)
+                cosine_distance = (1 - cosine_similarity)*100
 
                 # Save the dissimilarity and the image
-                imsave(torchvision.utils.make_grid(concat_image), 'results/fast_wave_11/image_' + str(i) + f'Dissimilarity: {euclidean_distance.item():.2f}'  +  '.png')
+                imsave(torchvision.utils.make_grid(concat_image), 'results/peachy_rain_17_final/image_' + str(i) + f'Dissimilarity: {cosine_distance.item():.2f}'  +  '.png')
 
         return {"loss": 0} #, "preds": preds, "targets": targets}
 
@@ -239,7 +239,7 @@ class SiameseModule(LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,
-                "monitor": "train/loss",
+                "monitor": "val/loss",
                 "interval": "epoch",
                 "frequency": 1,
             },
