@@ -20,11 +20,12 @@ class Siamese_CNN(nn.Module):
         self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # Use the FC layers of a pretrained network (ResNet-18)
-
-        self.fc1 = nn.Linear(512 * (input_size // 4) * (input_size // 4), 1024)
+        resnet18 = torchvision.models.resnet18(pretrained=True)
+        self.avgpool = resnet18.avgpool
+        self.fc1 = resnet18.fc
         self.dropout1 = nn.Dropout(p=0.5)
         self.relu3 = nn.ReLU()
-        self.fc2 = nn.Linear(1024, 256)
+        self.fc2 = nn.Linear(1000, 256)
 
 
     def forward_once(self, x):
@@ -38,6 +39,7 @@ class Siamese_CNN(nn.Module):
         x = self.relu2(x)
         x = self.maxpool2(x)
 
+        x = self.avgpool(x)
         x = x.view(x.size()[0], -1)
         x = self.fc1(x)
         x = self.dropout1(x)

@@ -48,10 +48,8 @@ class SiameseModule(LightningModule):
 
         # self.net = net
         self.mvtn = multi_view_net  
-        # self.mvtn.freeze()  # TODO: make this model's parameters freezed
 
         self.mvtn_renderer = multi_view_renderer
-        # self.mvtn_renderer.freeze() # TODO: make this model's parameters freezed
 
         depth2featdim = {18: 512, 34: 512, 50: 2048, 101: 2048, 152: 2048}
         assert mvnet_depth in depth2featdim.keys(), "mvnet_depth must be one of 18, 34, 50, 101, 152"
@@ -118,14 +116,14 @@ class SiameseModule(LightningModule):
             B, M, C, H, W = rendered_images.shape
             pooled_view = torch.max(unbatch_tensor(self.mvnetwork(batch_tensor(
                 rendered_images, dim=1, squeeze=True)
-                .type(torch.FloatTensor)
+                # .type(torch.FloatTensor)
                 ), B, dim=1, unsqueeze=True), dim=1)[0]
             shape_features = pooled_view.squeeze()
 
             image_features = self.image_feature_extractor(image)
         
         # TODO: remove this line while training
-        shape_features = shape_features.unsqueeze(0)
+        # shape_features = shape_features.unsqueeze(0)
 
         siamese_feature_shape, siamese_feature_image = self.siamese_cnn(shape_features, image_features)
 
