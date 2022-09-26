@@ -3,8 +3,8 @@ _target_: src.models.Siamese_module.SiameseModule
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
-  lr: 0.001
-  weight_decay: 0.0
+  lr: 0.0005
+  weight_decay: 0.0001
 
 scheduler:
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
@@ -55,6 +55,6 @@ siamese_cnn:
 
 criterion:
   _target_: src.models.loss_functions.contrastive_loss.ContrastiveLoss
-  margin: 0.3
+  margin: 0.5
 
 

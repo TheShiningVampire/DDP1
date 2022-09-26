@@ -152,6 +152,22 @@ class ShapeNetBase(torch.utils.data.Dataset):
 
         return verts, faces.verts_idx, textures
 
+    def _load_mesh_off(self, model_path) -> Tuple:
+        from pytorch3d.io import IO 
+
+        mesh = IO().load_mesh(model_path)
+        verts = mesh.verts_packed()
+        faces = mesh.faces_packed()
+
+        textures = verts.new_ones(
+            faces.shape[0],
+            self.texture_resolution,
+            self.texture_resolution,
+            3,
+        )
+
+        return verts, faces, textures
+
 
 class ShapeNetCore(ShapeNetBase):
     """
@@ -439,8 +455,6 @@ class Siamese_Pix3D(ShapeNetBase):
             img = self.transform(img)
 
         return (mesh, points), img, torch.from_numpy(np.array([int(img_tuple[1] != class_indx)], dtype=np.float32))
-
-
 
 # if __name__ == "__main__":
 #     data_dir = '/home/SharedData/Vinit/pix3d_preprocessed/'

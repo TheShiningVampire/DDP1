@@ -26,6 +26,7 @@ class Siamese_CNN(nn.Module):
         self.dropout1 = nn.Dropout(p=0.5)
         self.relu3 = nn.ReLU()
         self.fc2 = nn.Linear(1000, 256)
+        self.relu4 = nn.ReLU()
 
 
     def forward_once(self, x):
@@ -45,6 +46,7 @@ class Siamese_CNN(nn.Module):
         x = self.dropout1(x)
         x = self.relu3(x)
         x = self.fc2(x)
+        x = self.relu4(x)
 
         return x
 
