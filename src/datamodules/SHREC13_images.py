@@ -1,13 +1,15 @@
 from typing import Any, Dict, Optional, Tuple
+import os
 
 import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.transforms import transforms
+import torchvision.datasets as datasets
 from src.datamodules.components.Siamese_SHREC_datamodule import Siamese_SHREC13, collate_fn
 
 
-class SHREC13_DataModule(LightningDataModule):
+class SHREC13_Image_Module(LightningDataModule):
     """Example of LightningDataModule for MNIST dataset.
 
     A DataModule implements 5 key methods:
@@ -41,6 +43,8 @@ class SHREC13_DataModule(LightningDataModule):
         batch_size: int = 64,
         num_workers: int = 0,
         pin_memory: bool = False,
+        data_mean: Tuple[float, float, float] = [0.9799, 0.9799, 0.9799],
+        data_std: Tuple[float, float, float] = [0.1075, 0.1075, 0.1075]
     ):
         super().__init__()
 
@@ -49,7 +53,11 @@ class SHREC13_DataModule(LightningDataModule):
         self.save_hyperparameters(logger=False)
 
         # data transformations
-        self.transforms = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])
+        self.transforms = transforms.Compose([transforms.Resize((224, 224)), 
+                                             transforms.ToTensor(),
+                                            transforms.Normalize(mean=data_mean, std=data_std)])
+
+                                             
 
         self.data_train: Optional[Dataset] = None
         self.data_val: Optional[Dataset] = None
@@ -74,9 +82,15 @@ class SHREC13_DataModule(LightningDataModule):
         """
         # load and split datasets only if not loaded already
         if not self.data_train and not self.data_test:
-            trainset = Siamese_SHREC13(self.hparams.data_dir, split="train", nb_points=self.hparams.nb_points, load_textures=False,dset_norm=self.hparams.dset_norm, simplified_mesh=False, transform=self.transforms)
+            # trainset = Siamese_SHREC13(self.hparams.data_dir, split="train", nb_points=self.hparams.nb_points, load_textures=False,dset_norm=self.hparams.dset_norm, simplified_mesh=False, transform=self.transforms)
 
-            testset = Siamese_SHREC13(self.hparams.data_dir, split="test", nb_points=self.hparams.nb_points, load_textures=False,dset_norm=self.hparams.dset_norm, simplified_mesh=False, transform=self.transforms)
+            # testset = Siamese_SHREC13(self.hparams.data_dir, split="test", nb_points=self.hparams.nb_points, load_textures=False,dset_norm=self.hparams.dset_norm, simplified_mesh=False, transform=self.transforms)
+
+            train_dir = os.path.join(self.hparams.data_dir, "train", "img")
+            test_dir = os.path.join(self.hparams.data_dir, "test", "img")
+
+            trainset = datasets.ImageFolder(train_dir, transform=self.transforms)
+            testset = datasets.ImageFolder(test_dir, transform=self.transforms)
 
             train_size = int(0.8 * len(trainset))
             val_size = len(trainset) - train_size
@@ -92,8 +106,7 @@ class SHREC13_DataModule(LightningDataModule):
             batch_size=self.hparams.batch_size,
             num_workers=self.hparams.num_workers,
             pin_memory=self.hparams.pin_memory,
-            shuffle=True,
-            collate_fn=collate_fn
+            shuffle=True
         )
 
     def val_dataloader(self):
@@ -102,8 +115,7 @@ class SHREC13_DataModule(LightningDataModule):
             batch_size=self.hparams.batch_size,
             num_workers=self.hparams.num_workers,
             pin_memory=self.hparams.pin_memory,
-            shuffle=False,
-            collate_fn=collate_fn
+            shuffle=False
         )
 
     def test_dataloader(self):
@@ -112,8 +124,7 @@ class SHREC13_DataModule(LightningDataModule):
             batch_size=self.hparams.batch_size,
             num_workers=self.hparams.num_workers,
             pin_memory=self.hparams.pin_memory,
-            shuffle=False,
-            collate_fn=collate_fn
+            shuffle=False
         )
 
     def teardown(self, stage: Optional[str] = None):
