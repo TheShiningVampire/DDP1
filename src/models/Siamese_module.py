@@ -63,10 +63,10 @@ class SiameseModule(LightningModule):
 
 
         ## TODO: remove this line while training
-        # self.mvtn.requires_grad_(False)
-        # self.mvtn_renderer.requires_grad_(False)
-        # self.mvnetwork.requires_grad_(False)
-        # self.image_feature_extractor.requires_grad_(False)
+        self.mvtn.requires_grad_(False)
+        self.mvtn_renderer.requires_grad_(False)
+        self.mvnetwork.requires_grad_(False)
+        self.image_feature_extractor.requires_grad_(False)
 
         self.siamese_cnn = siamese_cnn
 
