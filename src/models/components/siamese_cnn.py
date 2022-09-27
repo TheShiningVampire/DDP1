@@ -19,7 +19,7 @@ class Siamese_CNN(nn.Module):
         self.relu2 = nn.ReLU()
         self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        # Use the FC layers of a pretrained network (ResNet-18)
+        # Use the FC layers of a pretrained network (ResNet-50)
         resnet50 = torchvision.models.resnet50(pretrained=True)
         self.avgpool = resnet50.avgpool
         self.fc1 = resnet50.fc
