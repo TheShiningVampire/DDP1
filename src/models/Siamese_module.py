@@ -60,7 +60,7 @@ class SiameseModule(LightningModule):
         assert mvnet_depth in depth2featdim.keys(), "mvnet_depth must be one of 18, 34, 50, 101, 152"
         # mvnetwork = torchvision.models.__dict__["resnet{}".format(mvnet_depth)](pretrained=True)
     
-        image_feature_extractor = torchvision.models.__dict__["resnet{}".format(mvnet_depth)])(pretrained=True)
+        image_feature_extractor = torchvision.models.__dict__["resnet{}".format(mvnet_depth)]()
 
         mvnetwork = shape_feature_network
         image_weights = torch.load(image_network_weights)["state_dict"]
@@ -74,12 +74,12 @@ class SiameseModule(LightningModule):
         shape_weights = {k[4:]: v for k, v in shape_weights.items()}
 
         # Load the weights
-        # image_feature_extractor.load_state_dict(image_weights, strict=False)
+        image_feature_extractor.load_state_dict(image_weights, strict=False)
         mvnetwork.load_state_dict(shape_weights)
 
 
         self.mvnetwork = torch.nn.Sequential(*list(mvnetwork.children())[0][:feature_extractor_num_layers])
-        # self.image_feature_extractor = torch.nn.Sequential(*list(image_feature_extractor.children())[:feature_extractor_num_layers])
+        self.image_feature_extractor = torch.nn.Sequential(*list(image_feature_extractor.children())[:feature_extractor_num_layers])
 
 
 

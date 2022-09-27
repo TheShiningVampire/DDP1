@@ -41,6 +41,8 @@ class SHREC13_DataModule(LightningDataModule):
         batch_size: int = 64,
         num_workers: int = 0,
         pin_memory: bool = False,
+        nb_points: int = 2048,
+        dset_norm: int = 2,
     ):
         super().__init__()
 
