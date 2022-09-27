@@ -38,8 +38,12 @@ class SiameseModule(LightningModule):
         feature_extractor_num_layers: int,
         siamese_cnn: torch.nn.Module,
         criterion: torch.nn.Module,
+        image_feature_network: torch.nn.Module,
+        shape_feature_network: torch.nn.Module,
+        image_network_weights: str,
+        shape_network_weights: str,
         optimizer: torch.optim.Optimizer,
-        scheduler: torch.optim.lr_scheduler,
+        scheduler: torch.optim.lr_scheduler._LRScheduler
     ):
         super().__init__()
 
@@ -54,12 +58,29 @@ class SiameseModule(LightningModule):
 
         depth2featdim = {18: 512, 34: 512, 50: 2048, 101: 2048, 152: 2048}
         assert mvnet_depth in depth2featdim.keys(), "mvnet_depth must be one of 18, 34, 50, 101, 152"
-        mvnetwork = torchvision.models.__dict__["resnet{}".format(mvnet_depth)](pretrained=True)
+        # mvnetwork = torchvision.models.__dict__["resnet{}".format(mvnet_depth)](pretrained=True)
     
-        image_feature_extractor = torchvision.models.__dict__["resnet{}".format(mvnet_depth)](pretrained=True)
+        image_feature_extractor = torchvision.models.__dict__["resnet{}".format(mvnet_depth)]()
 
-        self.mvnetwork = torch.nn.Sequential(*list(mvnetwork.children())[:feature_extractor_num_layers])
+        mvnetwork = shape_feature_network
+        image_weights = torch.load(image_network_weights)["state_dict"]
+        shape_weights = torch.load(shape_network_weights)["state_dict"]
+
+        # Get rid of the "net." prefix in the weights
+        image_weights = {k[10:]: v for k, v in image_weights.items()}
+
+        # Get rid of the keys that have 'mvtn' in them
+        shape_weights = {k: v for k, v in shape_weights.items() if "mvtn" not in k[:4]}
+        shape_weights = {k[4:]: v for k, v in shape_weights.items()}
+
+        # Load the weights
+        image_feature_extractor.load_state_dict(image_weights, strict=False)
+        mvnetwork.load_state_dict(shape_weights)
+
+
+        self.mvnetwork = torch.nn.Sequential(*list(mvnetwork.children())[0][:feature_extractor_num_layers])
         self.image_feature_extractor = torch.nn.Sequential(*list(image_feature_extractor.children())[:feature_extractor_num_layers])
+
 
 
         ## TODO: remove this line while training
