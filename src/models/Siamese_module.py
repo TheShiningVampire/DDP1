@@ -96,14 +96,14 @@ class SiameseModule(LightningModule):
 
         # use separate metric instance for train, val and test step
         # to ensure a proper reduction over the epoch
-        # self.train_acc = Accuracy()
-        # self.val_acc = Accuracy()
-        # self.val_loss = ContrastiveLoss()
-        # self.test_acc = Accuracy()
+        self.train_acc = Accuracy()
+        self.val_acc = Accuracy()
+        self.val_loss = ContrastiveLoss()
+        self.test_acc = Accuracy()
 
         # for logging best so far validation accuracy
-        # self.val_acc_best = MaxMetric()
-        # self.val_loss_best = MinMetric()
+        self.val_acc_best = MaxMetric()
+        self.val_loss_best = MinMetric()
 
     # def feature_extractor(self, meshes: torch.Tensor, points: torch.Tensor, image: torch.Tensor):
     #     c_batch_size = len(meshes)
@@ -168,43 +168,48 @@ class SiameseModule(LightningModule):
 
         loss = self.criterion(output1=siamese_feature_shape, output2=siamese_feature_image, label=label)
 
-        return loss
+        # Calculate similarity using cosine similarity
+        similarity = F.cosine_similarity(siamese_feature_shape, siamese_feature_image, dim=1)
+
+        # Check if the similarity is above the threshold
+        pred = (similarity < 0.5)
+
+        return loss, pred.int(), label.int().squeeze()
 
     def training_step(self, batch: Any, batch_idx: int):
-        loss = self.step(batch)
+        loss, pred, label = self.step(batch) 
 
         # log train metrics
-        # acc = self.train_acc(preds, targets)
+        acc = self.train_acc(pred, label)
         self.log("train/loss", loss, on_step=False, on_epoch=True, prog_bar=False)
-        # self.log("train/acc", acc, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train/acc", acc, on_step=False, on_epoch=True, prog_bar=True)
 
         # we can return here dict with any tensors
         # and then read it in some callback or in `training_epoch_end()` below
         # remember to always return loss from `training_step()` or else backpropagation will fail!
-        return {"loss": loss}
+        return {"loss": loss, "pred": pred, "label": label}
 
     def training_epoch_end(self, outputs: List[Any]):
         # `outputs` is a list of dicts returned from `training_step()`
-        # self.train_acc.reset()
-        pass
+        self.train_acc.reset()
 
     def validation_step(self, batch: Any, batch_idx: int):
-        loss = self.step(batch)
+        loss, pred, label = self.step(batch)
 
         # log val metrics
-        # acc = self.val_acc(preds, targets)
+        acc = self.val_acc(pred, label)
         self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=False)
-        # self.log("val/acc", acc, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val/acc", acc, on_step=False, on_epoch=True, prog_bar=True)
 
-        return {"loss": loss} #, "preds": preds, "targets": targets}
+        return {"loss": loss, "preds": pred, "targets": label}
 
     def validation_epoch_end(self, outputs: List[Any]):
-        # acc = self.val_acc.compute()  # get val accuracy from current epoch
-        # loss = self.val_loss.forward()  # get val loss from current epoch
-        # self.val_loss_best.update(loss)  # update best val loss
-        # self.log("val/loss_best", self.val_loss_best.compute(), on_epoch=True, prog_bar=True)
-        # self.val_loss.reset()
-        pass
+        acc = self.val_acc.compute()  # get val accuracy from current epoch
+        loss = self.val_loss.forward()  # get val loss from current epoch
+        self.val_loss_best.update(loss)  # update best val loss
+        self.log("val/loss_best", self.val_loss_best.compute(), on_epoch=True, prog_bar=True)
+        self.val_loss.reset()
+        
 
     def test_step(self, batch: Any, batch_idx: int):
         # loss = self.step(batch)
@@ -245,7 +250,7 @@ class SiameseModule(LightningModule):
                 cosine_distance = (1 - cosine_similarity)*100
 
                 # Save the dissimilarity and the image
-                imsave(torchvision.utils.make_grid(concat_image), 'results/debug_overfit/image_' + str(i) + f'Dissimilarity: {cosine_distance.item():.2f}'  +  '.png')
+                imsave(torchvision.utils.make_grid(concat_image), 'results/pretrained_features/image_' + str(i) + f'Dissimilarity: {cosine_distance.item():.2f}'  +  '.png')
 
         return {"loss": 0} #, "preds": preds, "targets": targets}
 

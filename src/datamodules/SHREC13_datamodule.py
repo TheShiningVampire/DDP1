@@ -51,7 +51,14 @@ class SHREC13_DataModule(LightningDataModule):
         self.save_hyperparameters(logger=False)
 
         # data transformations
-        self.transforms = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])
+        self.transforms = transforms.Compose([transforms.Resize((224, 224)),
+                                             transforms.ToTensor(),
+                                             transforms.Normalize(
+                                                    mean=[0.9799, 0.9799, 0.9799],
+                                                    std=[0.1075, 0.1075, 0.1075]
+                                                )
+                                             ])
+                                             
 
         self.data_train: Optional[Dataset] = None
         self.data_val: Optional[Dataset] = None
