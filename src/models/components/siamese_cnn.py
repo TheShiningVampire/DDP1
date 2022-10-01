@@ -57,6 +57,5 @@ class Siamese_CNN(nn.Module):
 
         return output1, output2
 
-
 if __name__ == "__main__":
     _ = Siamese_CNN(3, 32)
