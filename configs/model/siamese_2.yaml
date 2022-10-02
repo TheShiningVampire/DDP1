@@ -1,10 +1,10 @@
-_target_: src.models.Siamese_module.SiameseModule
+_target_: src.models.Siamese_module_2.SiameseModule
 
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
   lr: 0.0001
-  weight_decay: 0.0
+  weight_decay: 0.0001
 
 scheduler:
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
@@ -49,20 +49,20 @@ mvnet_depth: 50
 feature_extractor_num_layers: 6
 
 siamese_cnn:
-  _target_: src.models.components.siamese_cnn.Siamese_CNN
+  _target_: src.models.components.siamese_cnn_2.Siamese_CNN
   input_channels: 512
   input_size: 28
   feature_extractor_num_layers: 6
 
 criterion:
   _target_: src.models.loss_functions.contrastive_loss.ContrastiveLoss
-  margin: 1.8
+  margin: 0.85
 
 shape_feature_network:
-  _target_: src.models.components.shape_feature_extractor.Shape_Feature_Extractor
+  _target_: src.models.components.shape_feature_extractor_2.Shape_Feature_Extractor
 
 image_feature_network:
-  _target_: src.models.components.image_feature_extractor.Img_Feature_Extractor
+  _target_: src.models.components.image_feature_extractor_2.Img_Feature_Extractor
 
 image_network_weights: /home/SharedData/Vinit/Saved_Weights/Img_Feature_Extractor/weight.ckpt
 

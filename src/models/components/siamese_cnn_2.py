@@ -1,14 +1,6 @@
 from torch import nn
 import torchvision
-
-# Resnet does this flatten, but when we split the model this does not stay a part of the forward pass anymore. So we need to implement it ourself
-class Flatten(nn.Module):
-    def __init__(self):
-        super(Flatten, self).__init__()
-        
-    def forward(self, x):
-        x = x.view(x.size(0), -1)
-        return x
+import torch
 
 class Siamese_CNN(nn.Module):
     def __init__(
@@ -18,13 +10,6 @@ class Siamese_CNN(nn.Module):
         feature_extractor_num_layers: int
         ):
         super().__init__()
-
-        # Use the FC layers of a pretrained network (ResNet-50)
-        resnet50 = torchvision.models.resnet50(pretrained=True)
-
-        # Use layers beyond feature_extractor_num_layers as shared layers
-        shared_layers = list(resnet50.children())[feature_extractor_num_layers:-1]
-        self.shared_layers = nn.Sequential(*shared_layers, Flatten())
 
         self.fc = nn.Sequential(
             nn.Linear(2048, 1024),
@@ -39,7 +24,7 @@ class Siamese_CNN(nn.Module):
 
 
     def forward_once(self, x):
-        x = self.shared_layers(x)
+        x = torch.squeeze(x)
         x = self.fc(x)
 
         return x

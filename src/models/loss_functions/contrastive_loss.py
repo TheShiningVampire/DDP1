@@ -19,7 +19,11 @@ class ContrastiveLoss(torch.nn.Module):
       cosine_similarity = F.cosine_similarity(output1, output2, dim=1, eps=1e-6)
       cosine_distance = 1 - cosine_similarity
 
-      loss_contrastive = torch.mean((1-label) * torch.pow(cosine_distance, 2) +
+      # # Calculate the contrastive loss
+      # loss_contrastive = torch.mean((1-label) * torch.pow(euclidean_distance, 2) +
+      #                             (label) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0), 2))
+
+      loss_contrastive = torch.sum((1-label) * torch.pow(cosine_distance, 2) +
                                     (label) * torch.pow(torch.clamp(self.margin - cosine_distance, min=0.0), 2))
 
       # loss_contrastive = torch.mean( (1- label) * cosine_distance +

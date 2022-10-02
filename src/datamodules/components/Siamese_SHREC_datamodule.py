@@ -263,5 +263,10 @@ class Siamese_SHREC13(SHRECBase):
         if self.transform is not None:
             img = self.transform(img)
 
-        return (mesh, points), img, torch.from_numpy(np.array([1 - should_get_same_class],dtype=np.float32))  # type: ignore
+        # Label is 0 if same class, 1 if different class
+        label = torch.from_numpy(np.array([1 - should_get_same_class],dtype=np.float32))
+        label = label.to(torch.float)
+        label = torch.squeeze(label)
+
+        return (mesh, points), img, label
 

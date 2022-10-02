@@ -74,11 +74,6 @@ class SHREC_SHAPE_Feat_Trainer(LightningModule):
         rendered_images, _ = self.mvtn_renderer(meshes, points, azim=azim, elev=elev, dist=dist)
         rendered_images = regualarize_rendered_views(rendered_images, 0.0, False, 0.3)
 
-        # B, M, C, H, W = rendered_images.shape
-        # pooled_view = torch.max(unbatch_tensor(self.net(batch_tensor(rendered_images, dim=1,  
-        #                         squeeze=True)), B, dim=1, unsqueeze=True), dim=1)[0] 
-
-        # return pooled_view.squeeze(1)
         return self.net(rendered_images)
 
     def on_train_start(self):

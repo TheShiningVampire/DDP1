@@ -13,7 +13,7 @@ from src.utils.utils import batch_tensor, unbatch_tensor, imsave
 from src.utils.ops import regualarize_rendered_views
 from src.models.loss_functions.contrastive_loss import ContrastiveLoss
 import torch.nn.functional as F
-
+from src.utils.utils import batch_tensor
 
 class SiameseModule(LightningModule):
     """Example of LightningModule for MNIST classification.
@@ -75,19 +75,19 @@ class SiameseModule(LightningModule):
 
         # Load the weights
         image_feature_extractor.load_state_dict(image_weights, strict=False)
-        mvnetwork.load_state_dict(shape_weights)
+        mvnetwork.load_state_dict(shape_weights, strict=False)
 
 
-        self.mvnetwork = torch.nn.Sequential(*list(mvnetwork.children())[0][:feature_extractor_num_layers])
-        self.image_feature_extractor = torch.nn.Sequential(*list(image_feature_extractor.children())[:feature_extractor_num_layers])
+        self.mvnetwork = torch.nn.Sequential(*list(mvnetwork.children()))
+        self.image_feature_extractor = torch.nn.Sequential(*list(image_feature_extractor.children())[:-1])
 
 
 
         ## TODO: remove this line while training
         self.mvtn.requires_grad_(False)
         self.mvtn_renderer.requires_grad_(False)
-        self.mvnetwork.requires_grad_(False)
-        self.image_feature_extractor.requires_grad_(False)
+        # self.mvnetwork.requires_grad_(False)
+        # self.image_feature_extractor.requires_grad_(False)
 
         self.siamese_cnn = siamese_cnn
 
@@ -131,18 +131,21 @@ class SiameseModule(LightningModule):
     def forward(self, meshes: torch.Tensor, points: torch.Tensor, image: torch.Tensor):
         c_batch_size = len(meshes)
 
-        # with torch.no_grad():
+
         azim, elev, dist = self.mvtn(points, c_batch_size=c_batch_size)
         rendered_images, _ = self.mvtn_renderer(meshes, points, azim=azim, elev=elev, dist=dist)
         rendered_images = regualarize_rendered_views(rendered_images, 0.0, False, 0.3)
 
+        # 2048 dimensional shape features
         B, M, C, H, W = rendered_images.shape
-        pooled_view = torch.max(unbatch_tensor(self.mvnetwork(batch_tensor(
-            rendered_images, dim=1, squeeze=True)
-            # .type(torch.FloatTensor)
-            ), B, dim=1, unsqueeze=True), dim=1)[0]
-        shape_features = pooled_view.squeeze()
+        input = batch_tensor(rendered_images, dim=1,squeeze=True)
+        shape_features = self.mvnetwork(input)
+        shape_features = shape_features.squeeze()
 
+        shape_features = unbatch_tensor(shape_features, B, dim=1, unsqueeze=True)
+        shape_features = torch.max(shape_features, dim=1)[0]
+
+        # 2048 dimensional image features
         image_features = self.image_feature_extractor(image)
         
         # TODO: remove this line while training
@@ -204,10 +207,10 @@ class SiameseModule(LightningModule):
 
     def validation_epoch_end(self, outputs: List[Any]):
         acc = self.val_acc.compute()  # get val accuracy from current epoch
-        loss = self.val_loss.forward()  # get val loss from current epoch
-        self.val_loss_best.update(loss)  # update best val loss
-        self.log("val/loss_best", self.val_loss_best.compute(), on_epoch=True, prog_bar=True)
-        self.val_loss.reset()
+        # loss = self.val_loss.forward()  # get val loss from current epoch
+        # self.val_loss_best.update(loss)  # update best val loss
+        # self.log("val/loss_best", self.val_loss_best.compute(), on_epoch=True, prog_bar=True)
+        # self.val_loss.reset()
         
 
     def test_step(self, batch: Any, batch_idx: int):
