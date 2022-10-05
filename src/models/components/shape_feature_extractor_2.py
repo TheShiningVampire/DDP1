@@ -23,6 +23,13 @@ class Shape_Feature_Extractor(nn.Module):
         # self.Linear3 = nn.Linear(512, 79)
         # self.log_softmax = nn.LogSoftmax(dim=1)
 
+        # Normalize the output
+        self.model = nn.Sequential(
+            self.model,
+            nn.Flatten(),
+            nn.BatchNorm1d(2048),
+        )
+
     def forward(self, input):
         input = self.model(input)
 

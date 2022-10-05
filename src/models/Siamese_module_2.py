@@ -60,14 +60,16 @@ class SiameseModule(LightningModule):
         assert mvnet_depth in depth2featdim.keys(), "mvnet_depth must be one of 18, 34, 50, 101, 152"
         # mvnetwork = torchvision.models.__dict__["resnet{}".format(mvnet_depth)](pretrained=True)
     
-        image_feature_extractor = torchvision.models.__dict__["resnet{}".format(mvnet_depth)]()
+        # image_feature_extractor = torchvision.models.__dict__["resnet{}".format(mvnet_depth)]()
+        image_feature_extractor = image_feature_network
 
         mvnetwork = shape_feature_network
         image_weights = torch.load(image_network_weights)["state_dict"]
         shape_weights = torch.load(shape_network_weights)["state_dict"]
 
         # Get rid of the "net." prefix in the weights
-        image_weights = {k[10:]: v for k, v in image_weights.items()}
+        # image_weights = {k[10:]: v for k, v in image_weights.items()}
+        image_weights = {k[4:]: v for k, v in image_weights.items()}
 
         # Get rid of the keys that have 'mvtn' in them
         shape_weights = {k: v for k, v in shape_weights.items() if "mvtn" not in k[:4]}
@@ -79,7 +81,9 @@ class SiameseModule(LightningModule):
 
 
         self.mvnetwork = torch.nn.Sequential(*list(mvnetwork.children()))
-        self.image_feature_extractor = torch.nn.Sequential(*list(image_feature_extractor.children())[:-1])
+        # self.image_feature_extractor = torch.nn.Sequential(*list(image_feature_extractor.children())[:-1])
+        # self.image_feature_extractor = torch.nn.Sequential(*list(image_feature_extractor.children))
+        self.image_feature_extractor = image_feature_extractor
 
 
 
@@ -105,56 +109,33 @@ class SiameseModule(LightningModule):
         self.val_acc_best = MaxMetric()
         self.val_loss_best = MinMetric()
 
-    # def feature_extractor(self, meshes: torch.Tensor, points: torch.Tensor, image: torch.Tensor):
-    #     c_batch_size = len(meshes)
-
-    #     azim, elev, dist = self.mvtn(points,                 
-    #                             c_batch_size=c_batch_size)
-        
-    #     rendered_images, _ = self.mvtn_renderer(meshes, points,  
-    #                         azim=azim, elev=elev, dist=dist)
-
-    #     rendered_images = regualarize_rendered_views(rendered_images, 0.0, False, 0.3)
-
-
-    #     shape_features = self.ViewMaxAgregate(rendered_images)
-    #     image_features = self.image_feature_extractor(image)
-
-    #     return shape_features, image_features
-
-    # def ViewMaxAgregate(self, mvimages):
-    #     B, M, C, H, W = mvimages.shape
-    #     pooled_view = torch.max(unbatch_tensor(self.mvnetwork(batch_tensor(
-    #         mvimages, dim=1, squeeze=True).type(torch.FloatTensor)), B, dim=1, unsqueeze=True), dim=1)[0]
-    #     return pooled_view.squeeze()
-
     def forward(self, meshes: torch.Tensor, points: torch.Tensor, image: torch.Tensor):
         c_batch_size = len(meshes)
 
-
-        azim, elev, dist = self.mvtn(points, c_batch_size=c_batch_size)
-        rendered_images, _ = self.mvtn_renderer(meshes, points, azim=azim, elev=elev, dist=dist)
-        rendered_images = regualarize_rendered_views(rendered_images, 0.0, False, 0.3)
+        with torch.no_grad():
+            azim, elev, dist = self.mvtn(points, c_batch_size=c_batch_size)
+            rendered_images, _ = self.mvtn_renderer(meshes, points, azim=azim, elev=elev, dist=dist)
+            rendered_images = regualarize_rendered_views(rendered_images, 0.0, False, 0.3)
 
         # 2048 dimensional shape features
         B, M, C, H, W = rendered_images.shape
         input = batch_tensor(rendered_images, dim=1,squeeze=True)
+        input = input.type(torch.cuda.FloatTensor)
         shape_features = self.mvnetwork(input)
         shape_features = shape_features.squeeze()
 
         shape_features = unbatch_tensor(shape_features, B, dim=1, unsqueeze=True)
         shape_features = torch.max(shape_features, dim=1)[0]
 
-        # 2048 dimensional image features
+        # # 2048 dimensional image features
         image_features = self.image_feature_extractor(image)
-        
+            
         # TODO: remove this line while training
         # shape_features = shape_features.unsqueeze(0)
 
         siamese_feature_shape, siamese_feature_image = self.siamese_cnn(shape_features, image_features)
 
         return siamese_feature_shape, siamese_feature_image
-
 
 
     def on_train_start(self):

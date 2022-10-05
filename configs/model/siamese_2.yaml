@@ -3,7 +3,7 @@ _target_: src.models.Siamese_module_2.SiameseModule
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
-  lr: 0.0001
+  lr: 0.00005
   weight_decay: 0.0001
 
 scheduler:
@@ -56,7 +56,7 @@ siamese_cnn:
 
 criterion:
   _target_: src.models.loss_functions.contrastive_loss.ContrastiveLoss
-  margin: 0.85
+  margin: 1.0
 
 shape_feature_network:
   _target_: src.models.components.shape_feature_extractor_2.Shape_Feature_Extractor

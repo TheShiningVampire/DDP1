@@ -86,8 +86,8 @@ class SiameseModule(LightningModule):
         ## TODO: remove this line while training
         self.mvtn.requires_grad_(False)
         self.mvtn_renderer.requires_grad_(False)
-        self.mvnetwork.requires_grad_(False)
-        self.image_feature_extractor.requires_grad_(False)
+        # self.mvnetwork.requires_grad_(False)
+        # self.image_feature_extractor.requires_grad_(False)
 
         self.siamese_cnn = siamese_cnn
 
@@ -105,43 +105,25 @@ class SiameseModule(LightningModule):
         self.val_acc_best = MaxMetric()
         self.val_loss_best = MinMetric()
 
-    # def feature_extractor(self, meshes: torch.Tensor, points: torch.Tensor, image: torch.Tensor):
-    #     c_batch_size = len(meshes)
-
-    #     azim, elev, dist = self.mvtn(points,                 
-    #                             c_batch_size=c_batch_size)
-        
-    #     rendered_images, _ = self.mvtn_renderer(meshes, points,  
-    #                         azim=azim, elev=elev, dist=dist)
-
-    #     rendered_images = regualarize_rendered_views(rendered_images, 0.0, False, 0.3)
-
-
-    #     shape_features = self.ViewMaxAgregate(rendered_images)
-    #     image_features = self.image_feature_extractor(image)
-
-    #     return shape_features, image_features
-
-    # def ViewMaxAgregate(self, mvimages):
-    #     B, M, C, H, W = mvimages.shape
-    #     pooled_view = torch.max(unbatch_tensor(self.mvnetwork(batch_tensor(
-    #         mvimages, dim=1, squeeze=True).type(torch.FloatTensor)), B, dim=1, unsqueeze=True), dim=1)[0]
-    #     return pooled_view.squeeze()
-
     def forward(self, meshes: torch.Tensor, points: torch.Tensor, image: torch.Tensor):
         c_batch_size = len(meshes)
 
-        # with torch.no_grad():
-        azim, elev, dist = self.mvtn(points, c_batch_size=c_batch_size)
-        rendered_images, _ = self.mvtn_renderer(meshes, points, azim=azim, elev=elev, dist=dist)
-        rendered_images = regualarize_rendered_views(rendered_images, 0.0, False, 0.3)
+        with torch.no_grad():
+            azim, elev, dist = self.mvtn(points, c_batch_size=c_batch_size)
+            rendered_images, _ = self.mvtn_renderer(meshes, points, azim=azim, elev=elev, dist=dist)
+            rendered_images = regualarize_rendered_views(rendered_images, 0.0, False, 0.3)
 
         B, M, C, H, W = rendered_images.shape
-        pooled_view = torch.max(unbatch_tensor(self.mvnetwork(batch_tensor(
-            rendered_images, dim=1, squeeze=True)
-            # .type(torch.FloatTensor)
-            ), B, dim=1, unsqueeze=True), dim=1)[0]
-        shape_features = pooled_view.squeeze()
+        # pooled_view = torch.max(unbatch_tensor(self.mvnetwork(batch_tensor(
+        #     rendered_images, dim=1, squeeze=True)
+        #     # .type(torch.FloatTensor)
+        #     ), B, dim=1, unsqueeze=True), dim=1)[0]
+        # shape_features = pooled_view.squeeze()
+
+        rendered_images = batch_tensor(rendered_images, dim=1, squeeze=True)
+        shape_features = self.mvnetwork(rendered_images).clone()
+        shape_features = unbatch_tensor(shape_features, B, dim=1, unsqueeze=True)
+        shape_features = torch.max(shape_features, dim=1)[0]
 
         image_features = self.image_feature_extractor(image)
         

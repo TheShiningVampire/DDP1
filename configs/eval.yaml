@@ -6,7 +6,7 @@ defaults:
   - model: siamese.yaml
   - logger: null
   - trainer: default.yaml
-  - paths: default.yaml
+  - paths: small_dataset.yaml
   - extras: default.yaml
   - hydra: default.yaml
 

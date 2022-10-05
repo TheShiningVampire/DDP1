@@ -5,12 +5,12 @@
 defaults:
   - _self_
   - datamodule: shrec13.yaml
-  - model: siamese_2.yaml
+  - model: siamese.yaml
   - callbacks: default.yaml
   - logger: null # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: gpu.yaml
   # - trainer: ddp.yaml
-  - paths: default.yaml
+  - paths: small_dataset.yaml
   - extras: default.yaml
   - hydra: default.yaml
 
