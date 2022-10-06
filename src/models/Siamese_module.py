@@ -4,7 +4,7 @@ from pandas import concat
 
 import torch
 from pytorch_lightning import LightningModule
-from torchmetrics import MaxMetric, MinMetric
+from torchmetrics import MaxMetric, MinMetric, MeanMetric
 from torchmetrics.classification.accuracy import Accuracy
 import torchvision
 
@@ -98,8 +98,13 @@ class SiameseModule(LightningModule):
         # to ensure a proper reduction over the epoch
         self.train_acc = Accuracy()
         self.val_acc = Accuracy()
-        self.val_loss = ContrastiveLoss()
         self.test_acc = Accuracy()
+
+        # Average loss over batches
+        self.train_loss = MeanMetric()
+        self.val_loss = MeanMetric()
+        self.test_loss = MeanMetric()
+
 
         # for logging best so far validation accuracy
         self.val_acc_best = MaxMetric()
@@ -139,7 +144,7 @@ class SiameseModule(LightningModule):
     def on_train_start(self):
         # by default lightning executes validation step sanity checks before training starts,
         # so we need to make sure val_acc_best doesn't store accuracy from these checks
-        self.val_loss_best.reset()
+        self.val_acc_best.reset()
 
     def step(self, batch: Any):
         (model_shape, image, label) = batch
@@ -161,9 +166,10 @@ class SiameseModule(LightningModule):
         loss, pred, label = self.step(batch) 
 
         # log train metrics
-        acc = self.train_acc(pred, label)
-        self.log("train/loss", loss, on_step=False, on_epoch=True, prog_bar=False)
-        self.log("train/acc", acc, on_step=False, on_epoch=True, prog_bar=True)
+        self.train_loss(loss)
+        self.train_acc(pred, label)
+        self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=False)
+        self.log("train/acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
 
         # we can return here dict with any tensors
         # and then read it in some callback or in `training_epoch_end()` below
@@ -172,24 +178,23 @@ class SiameseModule(LightningModule):
 
     def training_epoch_end(self, outputs: List[Any]):
         # `outputs` is a list of dicts returned from `training_step()`
-        self.train_acc.reset()
+        pass
 
     def validation_step(self, batch: Any, batch_idx: int):
         loss, pred, label = self.step(batch)
 
         # log val metrics
-        acc = self.val_acc(pred, label)
-        self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=False)
-        self.log("val/acc", acc, on_step=False, on_epoch=True, prog_bar=True)
+        self.val_acc(pred, label)
+        self.val_loss(loss)
+        self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=False)
+        self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
 
         return {"loss": loss, "preds": pred, "targets": label}
 
     def validation_epoch_end(self, outputs: List[Any]):
         acc = self.val_acc.compute()  # get val accuracy from current epoch
-        loss = self.val_loss.forward()  # get val loss from current epoch
-        self.val_loss_best.update(loss)  # update best val loss
-        self.log("val/loss_best", self.val_loss_best.compute(), on_epoch=True, prog_bar=True)
-        self.val_loss.reset()
+        self.val_acc_best.update(acc)  # update best val loss
+        self.log("val/acc_best", self.val_acc_best.compute(), prog_bar=True)
         
 
     def test_step(self, batch: Any, batch_idx: int):
