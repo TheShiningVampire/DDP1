@@ -125,7 +125,8 @@ class SiameseModule(LightningModule):
         #     ), B, dim=1, unsqueeze=True), dim=1)[0]
         # shape_features = pooled_view.squeeze()
 
-        rendered_images = batch_tensor(rendered_images, dim=1, squeeze=True)
+        # TODO: remove the FloatTensor conversion when training
+        rendered_images = batch_tensor(rendered_images, dim=1, squeeze=True).type(torch.FloatTensor)
         shape_features = self.mvnetwork(rendered_images).clone()
         shape_features = unbatch_tensor(shape_features, B, dim=1, unsqueeze=True)
         shape_features = torch.max(shape_features, dim=1)[0]
@@ -236,7 +237,7 @@ class SiameseModule(LightningModule):
                 cosine_distance = (1 - cosine_similarity)*100
 
                 # Save the dissimilarity and the image
-                imsave(torchvision.utils.make_grid(concat_image), 'results/pretrained_features/image_' + str(i) + f'Dissimilarity: {cosine_distance.item():.2f}'  +  '.png')
+                imsave(torchvision.utils.make_grid(concat_image), 'results/good_results/image_' + str(i) + f'Dissimilarity: {cosine_distance.item():.2f}'  +  '.png')
 
         return {"loss": 0} #, "preds": preds, "targets": targets}
 
