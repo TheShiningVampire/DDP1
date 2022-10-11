@@ -272,11 +272,12 @@ class DomainDisentangledModule(LightningModule):
         return {"loss": loss, "pred_positive": pred_pos, "label_positive": gt_pos, "pred_negative": pred_neg, "label_negative": gt_neg}
 
     def validation_epoch_end(self, outputs: List[Any]):
-        acc = self.val_acc.compute()  # get val accuracy from current epoch
+        # acc = self.val_acc.compute()  # get val accuracy from current epoch
         # loss = self.val_loss.forward()  # get val loss from current epoch
         # self.val_loss_best.update(loss)  # update best val loss
         # self.log("val/loss_best", self.val_loss_best.compute(), on_epoch=True, prog_bar=True)
         # self.val_loss.reset()
+        pass
         
 
     def test_step(self, batch: Any, batch_idx: int):
