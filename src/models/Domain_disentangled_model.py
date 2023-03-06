@@ -218,14 +218,14 @@ class DomainDisentangledModule(LightningModule):
         # Calculate similarity using cosine similarity between the image and negative model features
         similarity_neg = F.cosine_similarity(neg_model_domain_specific, image_domain_specific, dim=1)
 
-        # Print the negative domain specific features
-        print("Negative domain specific features: ", neg_model_domain_specific.detach().cpu().numpy())
+        # # Print the negative domain specific features
+        # print("Negative domain specific features: ", neg_model_domain_specific.detach().cpu().numpy())
 
-        ## Positive similarity
-        print("similarity_pos: ", similarity_pos.detach().cpu().numpy())
+        # ## Positive similarity
+        # print("similarity_pos: ", similarity_pos.detach().cpu().numpy())
 
-        ## Print the similarity values for negative models
-        print("similarity_neg: ", similarity_neg.detach().cpu().numpy())        
+        # ## Print the similarity values for negative models
+        # print("similarity_neg: ", similarity_neg.detach().cpu().numpy())        
 
         # Check if the similarity is above the threshold
         pred_pos = (similarity_pos < 0.5)
