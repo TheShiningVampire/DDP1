@@ -34,14 +34,16 @@ class SHREC_IMG_Feat_Trainer(LightningModule):
 
         self.net = net
 
-        weight_path = "/home/SharedData/Vinit/logs/temp1/checkpoints/epoch_034.ckpt"
-        weights = torch.load(weight_path)["state_dict"]
+        ## Not loading the weights
+        #
+        # weight_path = "/home/SharedData/Vinit/logs/temp1/checkpoints/epoch_034.ckpt"
+        # weights = torch.load(weight_path)["state_dict"]
         
-        # From the keys of the state_dict, remove net. prefix
-        weights = {k[4:]: v for k, v in weights.items()}
+        # # From the keys of the state_dict, remove net. prefix
+        # weights = {k[4:]: v for k, v in weights.items()}
 
-        # Load the weights
-        self.net.load_state_dict(weights)
+        # # Load the weights
+        # self.net.load_state_dict(weights)
 
         # loss function
         self.criterion = torch.nn.CrossEntropyLoss()

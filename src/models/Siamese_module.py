@@ -208,12 +208,18 @@ class SiameseModule(LightningModule):
 
         # return {"loss": loss} #, "preds": preds, "targets": targets}
 
-        if batch_idx == 0:
+        num_batch = 8
+        if batch_idx == num_batch:
             # We check the dissimilarity between the first image in the batch and the rest of the shapes
             (model_shape, image, label) = batch
             mesh, point = model_shape
             batch_size = len(mesh)
-            image0 = image[0]
+
+            num_image = 0
+            image0 = image[num_image]
+
+            mean=[0.9799, 0.9799, 0.9799]
+            std=[0.1075, 0.1075, 0.1075]
 
             for i in range(batch_size):
                 meshes = mesh[i]
@@ -224,9 +230,10 @@ class SiameseModule(LightningModule):
                 rendered_images = regualarize_rendered_views(rendered_images, 0.0, False, 0.3)
 
                 # Take one of the rendered images and compare it to the first image
-                image_i = rendered_images[0][3]
+                image_i = rendered_images[num_image][7]
                 image0 = image0.squeeze(0)
-                concat_image = torch.cat((image0, image_i.detach().cpu()), axis=1)
+                image1 = image0*std[0] + mean[0]
+                concat_image = torch.cat((image1, image_i.detach().cpu()), axis=1)
 
                 # Calculate the dissimilarity between the first image and the rest of the shapes
                 # Reshape image0 as 1x3xHxW
@@ -237,7 +244,7 @@ class SiameseModule(LightningModule):
                 cosine_distance = (1 - cosine_similarity)*100
 
                 # Save the dissimilarity and the image
-                imsave(torchvision.utils.make_grid(concat_image), 'results/good_results/image_' + str(i) + f'Dissimilarity: {cosine_distance.item():.2f}'  +  '.png')
+                imsave(torchvision.utils.make_grid(concat_image), 'results/good_results_12/image_' + str(i) + f'Dissimilarity: {cosine_distance.item():.2f}'  +  '.png')
 
         return {"loss": 0} #, "preds": preds, "targets": targets}
 
